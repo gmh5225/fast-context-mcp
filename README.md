@@ -4,7 +4,7 @@ AI-driven semantic code search powered by Windsurf's reverse-engineered SWE-grep
 
 You can use it in two ways:
 - **MCP mode** (for MCP-compatible clients)
-- **CLI mode** (for `npx` + `SKILL.md` workflows, no MCP binding required)
+- **CLI mode** (recommended for global command + `SKILL.md`, no MCP binding required)
 
 All tools are bundled via npm — **no system-level dependencies** needed (ripgrep via `@vscode/ripgrep`, tree via `tree-node-cli`). Works on macOS, Windows, and Linux.
 
@@ -48,7 +48,7 @@ No need to install ripgrep — it's bundled via `@vscode/ripgrep`.
 ## Installation
 
 ```bash
-git clone https://github.com/SammySnake-d/fast-context-mcp.git
+git clone https://github.com/gmh5225/fast-context-mcp.git
 cd fast-context-mcp
 npm install
 ```
@@ -181,33 +181,68 @@ Extract Windsurf API Key from local installation. No parameters.
 
 If you prefer not to use MCP tools, use the CLI directly and let your assistant call it through `SKILL.md`.
 
-### 1) CLI usage
-
-Run via npx (no global install needed):
+### 1) Install once globally (from GitHub)
 
 ```bash
-npx -y fast-context-mcp search --query "where is auth flow implemented" --project-path "/absolute/repo/path"
+npm i -g "git+https://github.com/gmh5225/fast-context-mcp.git"
+```
+
+Check if already installed:
+
+```bash
+fast-context-mcp --version
+```
+
+If this command works, skip reinstall.
+
+Optional upgrade:
+
+```bash
+npm i -g "git+https://github.com/gmh5225/fast-context-mcp.git"
+```
+
+> Short form also works: `npm i -g github:gmh5225/fast-context-mcp`
+
+### 2) CLI usage
+
+Run directly after global install:
+
+```bash
+fast-context-mcp search --query "where is auth flow implemented" --project-path "/absolute/repo/path"
+```
+
+Quick self-check:
+
+```bash
+fast-context-mcp --version
+fast-context-mcp help
 ```
 
 JSON output:
 
 ```bash
-npx -y fast-context-mcp search --query "router to service call chain" --project-path "/absolute/repo/path" --json
+fast-context-mcp search --query "router to service call chain" --project-path "/absolute/repo/path" --json
 ```
 
 Extract Windsurf key:
 
 ```bash
-npx -y fast-context-mcp extract-key --json
+fast-context-mcp extract-key --json
 ```
 
 Show full key explicitly (use with care):
 
 ```bash
-npx -y fast-context-mcp extract-key --json --reveal
+fast-context-mcp extract-key --json --reveal
 ```
 
-### 2) Skill file location
+If you do not want global install, fallback is still available:
+
+```bash
+npx -y fast-context-mcp <command>
+```
+
+### 3) Skill file location
 
 This repo includes a ready-to-use skill:
 
@@ -215,20 +250,27 @@ This repo includes a ready-to-use skill:
 
 When your agent supports filesystem skills, it can load this skill and call the CLI automatically.
 
-### 3) Recommended Skill prompt template
+### 4) Recommended Skill prompt template
 
 Use this template if you want to customize your own `SKILL.md`:
 
 ```markdown
 ### fast-context CLI — Semantic Code Discovery (L2)
 
-When a task requires codebase understanding (unknown module, architecture mapping, call-chain tracing, behavior location, fuzzy intent), run the CLI first:
+When a task requires codebase understanding (unknown module, architecture mapping, call-chain tracing, behavior location, fuzzy intent), use fast-context CLI first.
 
-`npx -y fast-context-mcp search --query "<PRIMARY_QUERY>" --project-path "<REPO_ROOT>" --tree-depth 3 --max-turns 3 --max-results 10`
+#### Install policy
+- Do not reinstall on every run.
+- Check availability first:
+  - `fast-context-mcp --version`
+- Install globally only when missing:
+  - `npm i -g "git+https://github.com/gmh5225/fast-context-mcp.git"`
+- Use `npx -y fast-context-mcp ...` only as fallback when global command is unavailable.
 
 #### Mandatory workflow
 1. Build `1` primary query + `2-4` alternate queries + `2-6` grep seed terms.
-2. Run CLI search once with the primary query.
+2. Run CLI search once with the primary query:
+   - `fast-context-mcp search --query "<PRIMARY_QUERY>" --project-path "<REPO_ROOT>" --tree-depth 3 --max-turns 3 --max-results 10`
 3. Use returned file ranges + grep keywords for precision grep/read.
 4. If needed, rerun with best alternate query.
 
@@ -247,6 +289,12 @@ When a task requires codebase understanding (unknown module, architecture mappin
 - Too shallow: increase `max_turns`, then `max_results`.
 - Payload issue: reduce `tree_depth` (`3 -> 2 -> 1`).
 - Too noisy: tighten query with concrete endpoint/event/table/class names.
+- 401/403: refresh credentials (`fast-context-mcp extract-key --json`) and retry.
+- 429: wait and retry with narrower scope.
+
+#### Key safety
+- Default to `fast-context-mcp extract-key --json` (masked output).
+- Use `--reveal` only when user explicitly requests full key output.
 ```
 
 ## Project Structure
@@ -260,7 +308,7 @@ fast-context-mcp/
 │           └── SKILL.md      # CLI skill template for agents
 ├── src/
 │   ├── server.mjs        # MCP server entry point
-│   ├── cli.mjs           # CLI entry point (for npx / skill-based workflow)
+│   ├── cli.mjs           # CLI entry point (global command / npx / skill-based workflow)
 │   ├── core.mjs          # Auth, message building, streaming, search loop
 │   ├── executor.mjs      # Tool executor: rg, readfile, tree, ls, glob
 │   ├── extract-key.mjs   # Windsurf API Key extraction (SQLite)

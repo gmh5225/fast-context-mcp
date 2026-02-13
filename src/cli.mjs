@@ -8,7 +8,17 @@
  */
 
 import { cwd, exit } from "node:process";
+import { readFileSync } from "node:fs";
 import { search, searchWithContent, extractKeyInfo } from "./core.mjs";
+
+const pkgVersion = (() => {
+  try {
+    const raw = readFileSync(new URL("../package.json", import.meta.url), "utf-8");
+    return JSON.parse(raw).version || "unknown";
+  } catch {
+    return "unknown";
+  }
+})();
 
 function printHelp() {
   process.stdout.write(
@@ -18,6 +28,7 @@ Commands:
   search       Semantic code search via Windsurf
   extract-key  Extract Windsurf API key from local installation
   help         Show this help
+  --version    Show CLI version
 
 Examples:
   fast-context-mcp search --query "where is auth handled"
@@ -158,6 +169,11 @@ async function main() {
   const argv = process.argv.slice(2);
   const command = argv[0] || "help";
   const args = parseArgs(argv.slice(1));
+
+  if (command === "--version" || command === "-v" || command === "version") {
+    process.stdout.write(`${pkgVersion}\n`);
+    return;
+  }
 
   if (command === "help" || command === "--help" || command === "-h") {
     printHelp();
