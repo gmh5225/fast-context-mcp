@@ -1,8 +1,12 @@
 # Fast Context MCP
 
-AI-driven semantic code search as an MCP tool — powered by Windsurf's reverse-engineered SWE-grep protocol.
+AI-driven semantic code search powered by Windsurf's reverse-engineered SWE-grep protocol.
 
-Any MCP-compatible client (Claude Code, Claude Desktop, Cursor, etc.) can use this to search codebases with natural language queries. All tools are bundled via npm — **no system-level dependencies** needed (ripgrep via `@vscode/ripgrep`, tree via `tree-node-cli`). Works on macOS, Windows, and Linux.
+You can use it in two ways:
+- **MCP mode** (for MCP-compatible clients)
+- **CLI mode** (for `npx` + `SKILL.md` workflows, no MCP binding required)
+
+All tools are bundled via npm — **no system-level dependencies** needed (ripgrep via `@vscode/ripgrep`, tree via `tree-node-cli`). Works on macOS, Windows, and Linux.
 
 ## How It Works
 
@@ -173,58 +177,76 @@ Error: Request failed: HTTP 413
 
 Extract Windsurf API Key from local installation. No parameters.
 
-## Recommended Prompt (for AI assistants)
+## CLI + Skill.md Workflow (No MCP)
 
-Use the template below in your system prompt / project rule so the assistant consistently calls this MCP tool in the right way.
+If you prefer not to use MCP tools, use the CLI directly and let your assistant call it through `SKILL.md`.
+
+### 1) CLI usage
+
+Run via npx (no global install needed):
+
+```bash
+npx -y fast-context-mcp search --query "where is auth flow implemented" --project-path "/absolute/repo/path"
+```
+
+JSON output:
+
+```bash
+npx -y fast-context-mcp search --query "router to service call chain" --project-path "/absolute/repo/path" --json
+```
+
+Extract Windsurf key:
+
+```bash
+npx -y fast-context-mcp extract-key --json
+```
+
+Show full key explicitly (use with care):
+
+```bash
+npx -y fast-context-mcp extract-key --json --reveal
+```
+
+### 2) Skill file location
+
+This repo includes a ready-to-use skill:
+
+- `.claude/skills/fast-context-cli/SKILL.md`
+
+When your agent supports filesystem skills, it can load this skill and call the CLI automatically.
+
+### 3) Recommended Skill prompt template
+
+Use this template if you want to customize your own `SKILL.md`:
 
 ```markdown
-### fast-context MCP — Semantic Code Discovery (L2)
+### fast-context CLI — Semantic Code Discovery (L2)
 
-When a task requires codebase understanding (unknown module, architecture mapping, call-chain tracing, behavior location, or fuzzy intent), call `mcp__fast-context__fast_context_search` before manual grep/read.
+When a task requires codebase understanding (unknown module, architecture mapping, call-chain tracing, behavior location, fuzzy intent), run the CLI first:
 
-#### Trigger Conditions
-- The user asks “where/how is X implemented”.
-- The target file/module is unknown.
-- Need end-to-end flow tracing (router -> service -> repository -> model, event -> handler -> side effects).
-- Query is conceptual/domain-level rather than an exact symbol.
-- Cross-language intent (Chinese/English) may improve recall.
+`npx -y fast-context-mcp search --query "<PRIMARY_QUERY>" --project-path "<REPO_ROOT>" --tree-depth 3 --max-turns 3 --max-results 10`
 
-#### Mandatory Workflow
-1. **Intent Expansion (short but rich)**  
-   Convert the user request into:
-   - `1` primary query (most complete),
-   - `2-4` alternate queries (short variants),
-   - `2-6` grep seed terms (identifiers, endpoint paths, event names, table names).
+#### Mandatory workflow
+1. Build `1` primary query + `2-4` alternate queries + `2-6` grep seed terms.
+2. Run CLI search once with the primary query.
+3. Use returned file ranges + grep keywords for precision grep/read.
+4. If needed, rerun with best alternate query.
 
-2. **First MCP Search (required)**  
-   Run `fast_context_search` with the primary query.
+#### Query expansion rules
+- Add aliases/abbreviations and architecture anchors.
+- Add domain entities and lifecycle terms.
+- Add bilingual (Chinese/English) paraphrase when useful.
+- Keep queries concise and avoid single-token queries.
 
-3. **Result-Guided Refinement**  
-   Use returned file ranges + `grep keywords` to refine with follow-up grep/read.
-   If still ambiguous, run one more `fast_context_search` using the best alternate query.
-
-#### Intent Expansion Rules
-- Add naming variants: abbreviations, aliases, singular/plural, verb/noun forms.
-- Add architecture anchors when relevant: `router`, `controller`, `handler`, `service`, `repository`, `model`, `middleware`, `bootstrap/init`.
-- Add domain entities and lifecycle words: create/update/delete, sync, retry, queue, websocket, cache, migration, config/env.
-- Add bilingual paraphrase when original query is Chinese or English only.
-- Prefer concise NL intent; avoid single-token queries.
-- If repo scope is known, optionally mention directories (e.g. `src/routes`, `services`, `db/migrations`) without over-constraining.
-
-#### Parameter Presets
+#### Tuning presets
 - Quick triage: `tree_depth=1, max_turns=1, max_results=5`
-- Balanced default: `tree_depth=3, max_turns=3, max_results=10`
+- Balanced: `tree_depth=3, max_turns=3, max_results=10`
 - Deep tracing: `tree_depth=3-4, max_turns=5, max_results=15-20`
 
-#### Retry Strategy
-- If results are too shallow: increase `max_turns` first, then `max_results`.
-- If payload/size errors appear: reduce `tree_depth` (e.g. `3 -> 2 -> 1`).
-- If noisy results: tighten query with concrete entities (endpoint/event/table/class names).
-
-#### Output Discipline
-- Report: selected files + why they matter + likely call chain.
-- Explicitly separate: “confirmed evidence” vs “inference”.
-- Provide next-step grep/read targets using tool-returned keywords.
+#### Retry strategy
+- Too shallow: increase `max_turns`, then `max_results`.
+- Payload issue: reduce `tree_depth` (`3 -> 2 -> 1`).
+- Too noisy: tighten query with concrete endpoint/event/table/class names.
 ```
 
 ## Project Structure
@@ -232,8 +254,13 @@ When a task requires codebase understanding (unknown module, architecture mappin
 ```
 fast-context-mcp/
 ├── package.json
+├── .claude/
+│   └── skills/
+│       └── fast-context-cli/
+│           └── SKILL.md      # CLI skill template for agents
 ├── src/
 │   ├── server.mjs        # MCP server entry point
+│   ├── cli.mjs           # CLI entry point (for npx / skill-based workflow)
 │   ├── core.mjs          # Auth, message building, streaming, search loop
 │   ├── executor.mjs      # Tool executor: rg, readfile, tree, ls, glob
 │   ├── extract-key.mjs   # Windsurf API Key extraction (SQLite)

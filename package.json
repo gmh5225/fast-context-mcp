@@ -4,8 +4,13 @@
   "description": "AI-driven semantic code search via reverse-engineered Windsurf protocol (Node.js)",
   "type": "module",
   "main": "src/server.mjs",
+  "bin": {
+    "fast-context-mcp": "src/cli.mjs",
+    "fast-context": "src/cli.mjs"
+  },
   "scripts": {
-    "start": "node src/server.mjs"
+    "start": "node src/server.mjs",
+    "cli": "node src/cli.mjs"
   },
   "engines": {
     "node": ">=18"
