@@ -187,6 +187,12 @@ If you prefer not to use MCP tools, use the CLI directly and let your assistant 
 npm i -g "git+https://github.com/gmh5225/fast-context-mcp.git"
 ```
 
+Smart install (skip reinstall if already present, bash/zsh):
+
+```bash
+fast-context-mcp --version >/dev/null 2>&1 || npm i -g "git+https://github.com/gmh5225/fast-context-mcp.git"
+```
+
 Check if already installed:
 
 ```bash
@@ -209,6 +215,18 @@ Run directly after global install:
 
 ```bash
 fast-context-mcp search --query "where is auth flow implemented" --project-path "/absolute/repo/path"
+```
+
+Alias command also works:
+
+```bash
+fast-context search --query "where is auth flow implemented" --project-path "/absolute/repo/path"
+```
+
+Short flags are also supported:
+
+```bash
+fast-context-mcp search -q "where is auth flow implemented" -p "/absolute/repo/path" -d 3 -t 3 -r 10
 ```
 
 Quick self-check:
@@ -242,6 +260,8 @@ If you do not want global install, fallback is still available:
 npx -y fast-context-mcp <command>
 ```
 
+If `fast-context-mcp` is not found after global install, ensure npm global bin is in your `PATH`.
+
 ### 3) Skill file location
 
 This repo includes a ready-to-use skill:
@@ -265,6 +285,8 @@ When a task requires codebase understanding (unknown module, architecture mappin
   - `fast-context-mcp --version`
 - Install globally only when missing:
   - `npm i -g "git+https://github.com/gmh5225/fast-context-mcp.git"`
+- Optional bash/zsh one-liner:
+  - `fast-context-mcp --version >/dev/null 2>&1 || npm i -g "git+https://github.com/gmh5225/fast-context-mcp.git"`
 - Use `npx -y fast-context-mcp ...` only as fallback when global command is unavailable.
 
 #### Mandatory workflow

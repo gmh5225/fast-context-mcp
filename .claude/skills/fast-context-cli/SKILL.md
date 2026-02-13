@@ -20,6 +20,7 @@ Use this skill first when:
 - First check whether the command already exists.
 - Install globally only when command is missing or broken.
 - Upgrade only when user asks, or when a known bug requires update.
+- Command aliases: `fast-context-mcp` (primary), `fast-context` (alias).
 
 ### Check command availability
 
@@ -31,6 +32,12 @@ fast-context-mcp --version
 
 ```bash
 npm i -g "git+https://github.com/gmh5225/fast-context-mcp.git"
+```
+
+### Auto install snippet (bash/zsh)
+
+```bash
+fast-context-mcp --version >/dev/null 2>&1 || npm i -g "git+https://github.com/gmh5225/fast-context-mcp.git"
 ```
 
 ### Verify installation
@@ -70,6 +77,10 @@ fast-context-mcp search --query "<PRIMARY_QUERY>" --project-path "<REPO_ROOT>" -
 
 ```bash
 fast-context-mcp search --query "<PRIMARY_QUERY>" --project-path "<REPO_ROOT>" --tree-depth 3 --max-turns 3 --max-results 10
+```
+
+```bash
+fast-context-mcp search -q "<PRIMARY_QUERY>" -p "<REPO_ROOT>" -d 3 -t 3 -r 10
 ```
 
 ```bash

@@ -33,17 +33,18 @@ Commands:
 Examples:
   fast-context-mcp search --query "where is auth handled"
   fast-context-mcp search --query "router to service flow" --project-path /path/to/repo --tree-depth 3 --max-turns 3
+  fast-context-mcp search -q "router to service flow" -p /path/to/repo -d 3 -t 3 -r 10
   fast-context-mcp search --query "login flow" --json
   fast-context-mcp extract-key --json
 
 Options (search):
   --query, -q              Natural language query (required)
-  --project-path           Project root (default: current working directory)
-  --tree-depth             Repo map depth 1-6 (default: 3)
-  --max-turns              Search rounds 1-5 (default: 3)
-  --max-results            Max files 1-30 (default: 10)
-  --max-commands           Max local commands per round (default: 8)
-  --timeout-ms             Request timeout in ms (default: 30000)
+  --project-path, -p       Project root (default: current working directory)
+  --tree-depth, -d         Repo map depth 1-6 (default: 3)
+  --max-turns, -t          Search rounds 1-5 (default: 3)
+  --max-results, -r        Max files 1-30 (default: 10)
+  --max-commands, -c       Max local commands per round (default: 8)
+  --timeout-ms, -T         Request timeout in ms (default: 30000)
   --json                   Output raw JSON
 
 Options (extract-key):
@@ -57,24 +58,41 @@ function parseArgs(argv) {
   const out = { _: [] };
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i];
-    if (!t.startsWith("--")) {
+    if (!t.startsWith("-")) {
       out._.push(t);
       continue;
     }
 
-    const eq = t.indexOf("=");
-    if (eq > 0) {
-      out[t.slice(2, eq)] = t.slice(eq + 1);
+    if (t.startsWith("--")) {
+      const eq = t.indexOf("=");
+      if (eq > 0) {
+        out[t.slice(2, eq)] = t.slice(eq + 1);
+        continue;
+      }
+
+      const key = t.slice(2);
+      const next = argv[i + 1];
+      if (next && !next.startsWith("-")) {
+        out[key] = next;
+        i++;
+      } else {
+        out[key] = true;
+      }
       continue;
     }
 
-    const key = t.slice(2);
+    // Short option form: -q value / -q
+    const short = t.slice(1);
+    if (!short) {
+      out._.push(t);
+      continue;
+    }
     const next = argv[i + 1];
-    if (next && !next.startsWith("--")) {
-      out[key] = next;
+    if (next && !next.startsWith("-")) {
+      out[short] = next;
       i++;
     } else {
-      out[key] = true;
+      out[short] = true;
     }
   }
   return out;
@@ -103,12 +121,12 @@ async function runSearch(args) {
     exit(2);
   }
 
-  const projectRoot = args["project-path"] || cwd();
-  const treeDepth = readInt(args["tree-depth"], 3, { min: 1, max: 6 });
-  const maxTurns = readInt(args["max-turns"], 3, { min: 1, max: 5 });
-  const maxResults = readInt(args["max-results"], 10, { min: 1, max: 30 });
-  const maxCommands = readInt(args["max-commands"], 8, { min: 1, max: 20 });
-  const timeoutMs = readInt(args["timeout-ms"], 30000, { min: 1000, max: 300000 });
+  const projectRoot = args["project-path"] || args.p || cwd();
+  const treeDepth = readInt(args["tree-depth"] ?? args.d, 3, { min: 1, max: 6 });
+  const maxTurns = readInt(args["max-turns"] ?? args.t, 3, { min: 1, max: 5 });
+  const maxResults = readInt(args["max-results"] ?? args.r, 10, { min: 1, max: 30 });
+  const maxCommands = readInt(args["max-commands"] ?? args.c, 8, { min: 1, max: 20 });
+  const timeoutMs = readInt(args["timeout-ms"] ?? args.T, 30000, { min: 1000, max: 300000 });
   const asJson = Boolean(args.json);
 
   if (asJson) {
