@@ -101,6 +101,19 @@ Add to `claude_desktop_config.json` under `mcpServers`:
 }
 ```
 
+#### Codex
+
+Edit `~/.codex/config.toml` and add:
+
+```toml
+[mcp_servers.fast-context-mcp]
+args = ["/absolute/path/to/fast-context-mcp/src/server.mjs"]
+command = "node"
+enabled = true
+```
+
+After saving, restart Codex so MCP server config is reloaded.
+
 > If `WINDSURF_API_KEY` is omitted, the server auto-discovers it from your local Windsurf installation.
 
 ## Environment Variables
