@@ -173,6 +173,60 @@ Error: Request failed: HTTP 413
 
 Extract Windsurf API Key from local installation. No parameters.
 
+## Recommended Prompt (for AI assistants)
+
+Use the template below in your system prompt / project rule so the assistant consistently calls this MCP tool in the right way.
+
+```markdown
+### fast-context MCP — Semantic Code Discovery (L2)
+
+When a task requires codebase understanding (unknown module, architecture mapping, call-chain tracing, behavior location, or fuzzy intent), call `mcp__fast-context__fast_context_search` before manual grep/read.
+
+#### Trigger Conditions
+- The user asks “where/how is X implemented”.
+- The target file/module is unknown.
+- Need end-to-end flow tracing (router -> service -> repository -> model, event -> handler -> side effects).
+- Query is conceptual/domain-level rather than an exact symbol.
+- Cross-language intent (Chinese/English) may improve recall.
+
+#### Mandatory Workflow
+1. **Intent Expansion (short but rich)**  
+   Convert the user request into:
+   - `1` primary query (most complete),
+   - `2-4` alternate queries (short variants),
+   - `2-6` grep seed terms (identifiers, endpoint paths, event names, table names).
+
+2. **First MCP Search (required)**  
+   Run `fast_context_search` with the primary query.
+
+3. **Result-Guided Refinement**  
+   Use returned file ranges + `grep keywords` to refine with follow-up grep/read.
+   If still ambiguous, run one more `fast_context_search` using the best alternate query.
+
+#### Intent Expansion Rules
+- Add naming variants: abbreviations, aliases, singular/plural, verb/noun forms.
+- Add architecture anchors when relevant: `router`, `controller`, `handler`, `service`, `repository`, `model`, `middleware`, `bootstrap/init`.
+- Add domain entities and lifecycle words: create/update/delete, sync, retry, queue, websocket, cache, migration, config/env.
+- Add bilingual paraphrase when original query is Chinese or English only.
+- Prefer concise NL intent; avoid single-token queries.
+- If repo scope is known, optionally mention directories (e.g. `src/routes`, `services`, `db/migrations`) without over-constraining.
+
+#### Parameter Presets
+- Quick triage: `tree_depth=1, max_turns=1, max_results=5`
+- Balanced default: `tree_depth=3, max_turns=3, max_results=10`
+- Deep tracing: `tree_depth=3-4, max_turns=5, max_results=15-20`
+
+#### Retry Strategy
+- If results are too shallow: increase `max_turns` first, then `max_results`.
+- If payload/size errors appear: reduce `tree_depth` (e.g. `3 -> 2 -> 1`).
+- If noisy results: tighten query with concrete entities (endpoint/event/table/class names).
+
+#### Output Discipline
+- Report: selected files + why they matter + likely call chain.
+- Explicitly separate: “confirmed evidence” vs “inference”.
+- Provide next-step grep/read targets using tool-returned keywords.
+```
+
 ## Project Structure
 
 ```
