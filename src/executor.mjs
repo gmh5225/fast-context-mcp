@@ -7,7 +7,7 @@
 
 import { execFileSync, execFile as execFileCb } from "node:child_process";
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
-import { join, resolve, relative, sep, basename } from "node:path";
+import { join, resolve, relative, isAbsolute } from "node:path";
 import { promisify } from "node:util";
 import { rgPath } from "@vscode/ripgrep";
 import treeNodeCli from "tree-node-cli";
@@ -47,16 +47,45 @@ export class ToolExecutor {
   }
 
   /**
-   * Map virtual /codebase path to real filesystem path.
-   * @param {string} virtual
-   * @returns {string}
+   * Check whether an absolute path is inside project root.
+   * @param {string} absPath
+   * @returns {boolean}
    */
-  _real(virtual) {
-    if (virtual.startsWith("/codebase")) {
-      const rel = virtual.slice("/codebase".length).replace(/^\/+/, "");
-      return join(this.root, rel);
+  _isInsideRoot(absPath) {
+    const relPath = relative(this.root, absPath);
+    return relPath === "" || (!relPath.startsWith("..") && !isAbsolute(relPath));
+  }
+
+  /**
+   * Resolve a user-provided path and enforce project-root sandboxing.
+   * Accepts /codebase virtual paths and relative paths.
+   * @param {string} inputPath
+   * @returns {{ ok: true, path: string } | { ok: false, error: string }}
+   */
+  _resolveSandboxedPath(inputPath) {
+    if (typeof inputPath !== "string" || !inputPath.trim()) {
+      return { ok: false, error: "Error: path must be a non-empty string" };
     }
-    return virtual;
+
+    const cleaned = inputPath.trim();
+    let candidate;
+    if (cleaned.startsWith("/codebase")) {
+      const relPath = cleaned.slice("/codebase".length);
+      candidate = resolve(this.root, `.${relPath}`);
+    } else if (isAbsolute(cleaned)) {
+      candidate = resolve(cleaned);
+    } else {
+      candidate = resolve(this.root, cleaned);
+    }
+
+    if (!this._isInsideRoot(candidate)) {
+      return {
+        ok: false,
+        error: `Error: path outside project root is not allowed: ${inputPath}`,
+      };
+    }
+
+    return { ok: true, path: candidate };
   }
 
   /**
@@ -123,7 +152,9 @@ export class ToolExecutor {
    */
   async rgAsync(pattern, path, include = null, exclude = null) {
     this.collectedRgPatterns.push(pattern);
-    const rp = this._real(path);
+    const resolved = this._resolveSandboxedPath(path);
+    if (!resolved.ok) return resolved.error;
+    const rp = resolved.path;
     if (!existsSync(rp)) {
       return `Error: path does not exist: ${path}`;
     }
@@ -169,7 +200,9 @@ export class ToolExecutor {
    */
   rg(pattern, path, include = null, exclude = null) {
     this.collectedRgPatterns.push(pattern);
-    const rp = this._real(path);
+    const resolved = this._resolveSandboxedPath(path);
+    if (!resolved.ok) return resolved.error;
+    const rp = resolved.path;
     if (!existsSync(rp)) {
       return `Error: path does not exist: ${path}`;
     }
@@ -215,7 +248,9 @@ export class ToolExecutor {
    * @returns {string}
    */
   readfile(file, startLine = null, endLine = null) {
-    const rp = this._real(file);
+    const resolved = this._resolveSandboxedPath(file);
+    if (!resolved.ok) return resolved.error;
+    const rp = resolved.path;
     try {
       const stat = statSync(rp);
       if (!stat.isFile()) {
@@ -249,7 +284,9 @@ export class ToolExecutor {
    * @returns {string}
    */
   tree(path, levels = null) {
-    const rp = this._real(path);
+    const resolved = this._resolveSandboxedPath(path);
+    if (!resolved.ok) return resolved.error;
+    const rp = resolved.path;
     try {
       const stat = statSync(rp);
       if (!stat.isDirectory()) {
@@ -284,7 +321,9 @@ export class ToolExecutor {
    * @returns {string}
    */
   ls(path, longFormat = false, allFiles = false) {
-    const rp = this._real(path);
+    const resolved = this._resolveSandboxedPath(path);
+    if (!resolved.ok) return resolved.error;
+    const rp = resolved.path;
     try {
       const stat = statSync(rp);
       if (!stat.isDirectory()) {
@@ -341,7 +380,9 @@ export class ToolExecutor {
    * @returns {string}
    */
   glob(pattern, path, typeFilter = "all") {
-    const rp = this._real(path);
+    const resolved = this._resolveSandboxedPath(path);
+    if (!resolved.ok) return resolved.error;
+    const rp = resolved.path;
 
     // Use recursive readdir + fnmatch since Node 22 globSync may not be available
     const matches = [];

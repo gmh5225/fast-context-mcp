@@ -363,19 +363,21 @@ async function getCachedJwt(apiKey) {
 }
 
 // ─── TLS Fallback ──────────────────────────────────────────
-// Match Python's SSL fallback: if NODE_TLS_REJECT_UNAUTHORIZED is not set
-// and the first fetch fails with a TLS error, disable cert verification.
+// Optional insecure fallback:
+// Only disable cert verification if user explicitly opts in via
+// FC_ALLOW_INSECURE_TLS_FALLBACK=1.
+const ALLOW_INSECURE_TLS_FALLBACK = process.env.FC_ALLOW_INSECURE_TLS_FALLBACK === "1";
 let _tlsFallbackApplied = false;
 
 function _applyTlsFallback() {
-  if (!_tlsFallbackApplied && !process.env.NODE_TLS_REJECT_UNAUTHORIZED) {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-    _tlsFallbackApplied = true;
-    process.stderr.write(
-      "[fast-context] WARNING: TLS certificate verification disabled due to connection failure. " +
-      "Set NODE_TLS_REJECT_UNAUTHORIZED=0 explicitly to suppress this warning.\n"
-    );
-  }
+  if (_tlsFallbackApplied || process.env.NODE_TLS_REJECT_UNAUTHORIZED === "0") return true;
+  if (!ALLOW_INSECURE_TLS_FALLBACK) return false;
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+  _tlsFallbackApplied = true;
+  process.stderr.write(
+    "[fast-context] WARNING: TLS certificate verification disabled by FC_ALLOW_INSECURE_TLS_FALLBACK=1.\n"
+  );
+  return true;
 }
 
 // ─── Network Layer ─────────────────────────────────────────
@@ -414,8 +416,8 @@ async function _unaryRequest(url, protoBytes, compress = true) {
   try {
     resp = await doFetch();
   } catch (e) {
-    // TLS or network error — try with cert verification disabled
-    _applyTlsFallback();
+    // TLS/network error: retry only when explicitly allowed.
+    if (!_applyTlsFallback()) throw e;
     resp = await doFetch();
   }
 
@@ -473,8 +475,7 @@ async function _streamingRequest(protoBytes, timeoutMs = 30000, maxRetries = 2) 
       try {
         resp = await doFetch();
       } catch (e) {
-        if (attempt === 0) {
-          _applyTlsFallback();
+        if (attempt === 0 && _applyTlsFallback()) {
           resp = await doFetch();
         } else {
           throw e;

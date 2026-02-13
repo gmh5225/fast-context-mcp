@@ -9,6 +9,7 @@
  *   FC_MAX_TURNS         — Search rounds per query (default: 3)
  *   FC_MAX_COMMANDS      — Max parallel commands per round (default: 8)
  *   FC_TIMEOUT_MS        — Connect-Timeout-Ms for streaming requests (default: 30000)
+ *   FC_ALLOW_INSECURE_TLS_FALLBACK — Set to 1 to allow insecure TLS fallback (default: disabled)
  *
  * Start:
  *   node src/server.mjs

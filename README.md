@@ -107,6 +107,7 @@ Add to `claude_desktop_config.json` under `mcpServers`:
 | `FC_MAX_TURNS` | `3` | Search rounds per query (more = deeper but slower) |
 | `FC_MAX_COMMANDS` | `8` | Max parallel commands per round |
 | `FC_TIMEOUT_MS` | `30000` | Connect-Timeout-Ms for streaming requests |
+| `FC_ALLOW_INSECURE_TLS_FALLBACK` | `0` | Set to `1` to allow retry with disabled TLS certificate verification (not recommended) |
 | `FC_RESULT_MAX_LINES` | `50` | Max lines per command output (truncation) |
 | `FC_LINE_MAX_CHARS` | `250` | Max characters per output line (truncation) |
 | `WS_MODEL` | `MODEL_SWE_1_6_FAST` | Windsurf model name |
@@ -206,6 +207,11 @@ fast-context-mcp/
 - **Local tools**: `rg` (bundled via @vscode/ripgrep), `readfile` (Node.js fs), `tree` (tree-node-cli), `ls` (Node.js fs), `glob` (Node.js fs)
 - **Auth**: API Key → JWT (auto-fetched per session)
 - **Runtime**: Node.js >= 18 (ESM)
+
+### Security Notes
+
+- Tool paths are sandboxed to the configured project root (`/codebase` mapping), preventing reads outside the target repo.
+- TLS certificate verification remains enabled by default. Insecure fallback is opt-in via `FC_ALLOW_INSECURE_TLS_FALLBACK=1`.
 
 ### Dependencies
 
