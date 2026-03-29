@@ -11,7 +11,7 @@
  *   → ANSWER: file paths + line ranges + suggested rg patterns
  */
 
-import { readdirSync, existsSync, statSync } from "node:fs";
+import { readdirSync, existsSync, statSync, readFileSync } from "node:fs";
 import { resolve, join, relative } from "node:path";
 import { gzipSync } from "node:zlib";
 import { randomUUID } from "node:crypto";
@@ -781,13 +781,67 @@ const MAX_TREE_BYTES = 250 * 1024;
  * @param {number} [targetDepth=3] - Desired tree depth (1-6)
  * @returns {{ tree: string, depth: number, sizeBytes: number, fellBack: boolean }}
  */
+
+/**
+ * Build exclude regex list for tree-node-cli from .gitignore + hardcoded defaults.
+ *
+ * tree-node-cli tests each entry against the full absolute path, so patterns must
+ * match path segments rather than bare names. Example: a path like
+ *   /home/user/project/target/debug
+ * must be matched by /(^|[/\\])target([/\\]|$)/, not /^target$/.
+ *
+ * Strategy:
+ *   1. Start with a hardcoded list of common build/cache directories.
+ *   2. Read <projectRoot>/.gitignore if it exists.
+ *   3. For each simple (no glob wildcard) entry, strip leading "**\/" or "\/"
+ *      and trailing "\/", then add the bare name to the set.
+ *   4. Convert every name to a path-segment regex.
+ *
+ * @param {string} projectRoot - Absolute path to the project root.
+ * @returns {RegExp[]}
+ */
+function buildTreeExcludes(projectRoot) {
+  const DEFAULTS = [
+    "target", "node_modules", ".git", "dist", "build",
+    ".venv", "venv", "out", "__pycache__",
+  ];
+  const names = new Set(DEFAULTS);
+
+  try {
+    const gitignorePath = join(projectRoot, ".gitignore");
+    if (existsSync(gitignorePath)) {
+      const lines = readFileSync(gitignorePath, "utf-8").split("\n");
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (!line || line.startsWith("#")) continue;
+        // Strip leading **/ or /, then trailing /
+        const cleaned = line.replace(/^\*\*\//, "").replace(/^\//, "").replace(/\/$/, "");
+        // Skip patterns that still contain glob wildcards or path separators
+        if (cleaned && !cleaned.includes("*") && !cleaned.includes("?") &&
+            !cleaned.includes("{") && !cleaned.includes("/")) {
+          names.add(cleaned);
+        }
+      }
+    }
+  } catch {
+    // Ignore read errors — fall back to defaults only
+  }
+
+  // Match /name/, /name at end, or name at string start (cross-platform separators)
+  return [...names].map(
+    (name) => new RegExp(
+      "(^|[/\\\\])" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([/\\\\]|$)"
+    )
+  );
+}
+
 function getRepoMap(projectRoot, targetDepth = 3) {
   const rootPattern = new RegExp(projectRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
   const dirName = projectRoot.split("/").pop() || projectRoot.split("\\").pop() || projectRoot;
 
   for (let L = targetDepth; L >= 1; L--) {
     try {
-      const stdout = treeNodeCli(projectRoot, { maxDepth: L });
+      const stdout = treeNodeCli(projectRoot, { maxDepth: L, exclude: buildTreeExcludes(projectRoot) });
       // tree-node-cli outputs basename as root line; replace with /codebase
       let treeStr = stdout.replace(rootPattern, "/codebase");
       // Also replace the basename root line (first line) if full path wasn't matched
